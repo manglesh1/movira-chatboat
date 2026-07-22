@@ -1,0 +1,15 @@
+{
+  "folders": [
+    {
+      "name": "Movira AI Standalone",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "backend/.cache": false
+    },
+    "editor.tabSize": 2,
+    "editor.formatOnSave": true
+  }
+}

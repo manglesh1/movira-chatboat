@@ -1,0 +1,14 @@
+{
+  "name": "movira-ai-standalone",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node backend/server.js",
+    "index": "node backend/scripts/build-index.js",
+    "eval:rag": "node backend/scripts/evaluate-retrieval.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

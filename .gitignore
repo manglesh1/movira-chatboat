@@ -1,0 +1,11 @@
+.env
+.env.*
+!.env.example
+
+node_modules/
+npm-debug.log*
+
+backend/.cache/
+knowledge-base/legacy-previous-kb/
+
+.DS_Store

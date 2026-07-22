@@ -1,0 +1,26 @@
+[
+  {
+    "question": "How do I create an activity?",
+    "expectedSources": ["05-products-activities-catalog.md"]
+  },
+  {
+    "question": "How does online checkout work?",
+    "expectedSources": ["03-booking-portal-online-checkout.md"]
+  },
+  {
+    "question": "How do I check in a guest?",
+    "expectedSources": ["10-tickets-checkin-redemption.md", "18-staff-daily-operations-guide.md"]
+  },
+  {
+    "question": "How do waivers work?",
+    "expectedSources": ["11-waivers-customers-crm.md"]
+  },
+  {
+    "question": "Can Movira AI refund a payment?",
+    "expectedSources": ["21-movira-ai-guardrails-and-refusals.md", "09-payments-refunds-transactions.md"]
+  },
+  {
+    "question": "Can Movira AI access real customer data?",
+    "expectedSources": ["21-movira-ai-guardrails-and-refusals.md"]
+  }
+]

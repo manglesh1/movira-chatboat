@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Movira AI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <div class="brand">
+            <span class="brand-mark">M</span>
+            <strong>Movira AI</strong>
+          </div>
+
+          <button id="newChatButton" class="sidebar-button primary" type="button">
+            <span>+</span>
+            New chat
+          </button>
+
+          <label class="search-box">
+            <span>Search chats</span>
+            <input id="historySearch" type="search" placeholder="Search" />
+          </label>
+        </div>
+
+        <section class="history-block" aria-label="Recent conversations">
+          <p>Recents</p>
+          <div id="conversationList" class="conversation-list"></div>
+        </section>
+      </aside>
+
+      <section class="chat-panel">
+        <header class="chat-header">
+          <h1>Movira AI</h1>
+        </header>
+
+        <section class="chat-workspace">
+          <div id="emptyState" class="empty-state">
+            <div class="assistant-glow">
+              <span class="brand-mark large">M</span>
+            </div>
+            <h2>How can I help with Movira today?</h2>
+            <p id="statusText">Checking assistant status...</p>
+          </div>
+
+          <section id="messages" class="messages" aria-live="polite"></section>
+
+          <form id="chatForm" class="chat-input-wrap">
+            <button class="plus-button" type="button" aria-label="Add context">+</button>
+            <textarea id="messageInput" rows="1" placeholder="Ask anything about Movira"></textarea>
+            <button class="send-button" type="submit" aria-label="Send message">Send</button>
+          </form>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
