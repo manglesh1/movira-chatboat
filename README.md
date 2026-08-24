@@ -162,6 +162,16 @@ For the current phase, keep the local vector index until the RAG quality is good
 - Do not invent operational facts.
 - Do not expose secrets, API keys, customer data, payment data, or live records.
 
+## Admin Dashboard Integration
+
+The authenticated admin dashboard chat now uses this service for staff questions. Keep this service running alongside the main API:
+
+```bash
+npm run dev
+```
+
+The main API connects to `http://127.0.0.1:8787` by default. Set `STAFF_AI_URL` on the main API when the Staff AI service is hosted elsewhere. Staff answers remain read-only and include the matched guide sources; the separate customer assistant is unchanged.
+
 ## Important Notes
 
 - Rebuild the index with `npm run index` after changing files in `knowledge-base/`.

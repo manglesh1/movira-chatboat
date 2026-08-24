@@ -1,4 +1,5 @@
 import { createChatAnswer } from "./openai.js";
+import { checkReadOnlyRequest } from "./read-only-guard.js";
 import { isVectorIndexCurrent, searchVectorIndex } from "./vector-store.js";
 
 const SYSTEM_PROMPT = `
@@ -10,6 +11,9 @@ Rules:
 - Do not use outside knowledge.
 - Do not invent policies, numbers, links, dates, or steps.
 - Do not claim that you completed an action.
+- You are read-only. You may explain documented steps, but you must not say you created, updated, cancelled, refunded, deleted, sent, approved, published, checked in, redeemed, or changed anything.
+- Do not look up, verify, or reveal live records. If live status is needed, tell the user which Movira page to check.
+- Do not run SQL, expose raw database records, or produce unrestricted database queries.
 - Do not access or describe real customer data, real bookings, real waivers, real payments, or real Movira backend records.
 - Do not give legal, HR, medical, or safety advice.
 - Use simple staff-facing language.
@@ -49,6 +53,16 @@ function cleanStaffAnswer(answer) {
 }
 
 export async function answerQuestion(config, question) {
+  const readOnlyCheck = checkReadOnlyRequest(question);
+  if (!readOnlyCheck.allowed) {
+    return {
+      answer: readOnlyCheck.answer,
+      sources: [],
+      type: "unsupported",
+      reason: readOnlyCheck.reason
+    };
+  }
+
   if (!config.openaiApiKey) {
     return {
       answer:
