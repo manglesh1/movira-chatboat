@@ -16,16 +16,16 @@ export function loadEnv(projectRoot) {
   }
 }
 
-export function getConfig(projectRoot) {
-  loadEnv(projectRoot);
+export function getConfig(projectRoot, { loadEnvironment = true, environment = process.env } = {}) {
+  if (loadEnvironment) loadEnv(projectRoot);
 
   return {
-    port: Number(process.env.PORT || 8787),
-    openaiApiKey: process.env.OPENAI_API_KEY || "",
-    chatModel: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-    embeddingModel: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
-    minSimilarityScore: Number(process.env.RAG_MIN_SIMILARITY_SCORE || 0.28),
-    maxRetrievedChunks: Number(process.env.RAG_MAX_RETRIEVED_CHUNKS || 9),
+    port: Number(environment.PORT || 8787),
+    openaiApiKey: environment.OPENAI_API_KEY || "",
+    chatModel: environment.OPENAI_MODEL || "gpt-4.1-mini",
+    embeddingModel: environment.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
+    minSimilarityScore: Number(environment.RAG_MIN_SIMILARITY_SCORE || 0.28),
+    maxRetrievedChunks: Number(environment.RAG_MAX_RETRIEVED_CHUNKS || 9),
     knowledgeBaseDir: path.join(projectRoot, "knowledge-base"),
     indexPath: path.join(projectRoot, "backend", ".cache", "vector-index.json"),
     frontendDir: path.join(projectRoot, "frontend")

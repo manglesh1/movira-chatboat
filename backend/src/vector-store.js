@@ -4,6 +4,13 @@ import crypto from "node:crypto";
 import { createEmbedding } from "./openai.js";
 
 const SUPPORTED_EXTENSIONS = new Set([".md", ".txt"]);
+const indexCache = new Map();
+const hashCache = new Map();
+
+function remember(cache, key, value) {
+  if (cache.size >= 8 && !cache.has(key)) cache.delete(cache.keys().next().value);
+  cache.set(key, value);
+}
 
 function stableId(value) {
   return crypto.createHash("sha256").update(value).digest("hex").slice(0, 16);
@@ -84,6 +91,7 @@ function buildDocumentChunks(file) {
 }
 
 function cosineSimilarity(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return 0;
   let dot = 0;
   let normA = 0;
   let normB = 0;
@@ -116,6 +124,14 @@ export function readKnowledgeFiles(knowledgeBaseDir) {
 }
 
 export function getKnowledgeBaseHash(knowledgeBaseDir) {
+  const names = fs.existsSync(knowledgeBaseDir) ? fs.readdirSync(knowledgeBaseDir)
+    .filter((file) => SUPPORTED_EXTENSIONS.has(path.extname(file).toLowerCase())).sort() : [];
+  const signature = names.map((file) => {
+    const stat = fs.statSync(path.join(knowledgeBaseDir, file), { bigint: true });
+    return `${file}:${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`;
+  }).join("|");
+  const cached = hashCache.get(knowledgeBaseDir);
+  if (cached?.signature === signature) return cached.hash;
   const files = readKnowledgeFiles(knowledgeBaseDir);
   const hash = crypto.createHash("sha256");
 
@@ -126,7 +142,9 @@ export function getKnowledgeBaseHash(knowledgeBaseDir) {
     hash.update("\n---\n");
   }
 
-  return hash.digest("hex");
+  const result = hash.digest("hex");
+  remember(hashCache, knowledgeBaseDir, { signature, hash: result });
+  return result;
 }
 
 export async function buildVectorIndex(config) {
@@ -184,16 +202,23 @@ export async function buildVectorIndex(config) {
 
 export function loadVectorIndex(config) {
   if (!fs.existsSync(config.indexPath)) return null;
-  return JSON.parse(fs.readFileSync(config.indexPath, "utf8"));
+  const stat = fs.statSync(config.indexPath, { bigint: true });
+  const signature = `${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`;
+  const cached = indexCache.get(config.indexPath);
+  if (cached?.signature === signature) return cached.index;
+  const index = JSON.parse(fs.readFileSync(config.indexPath, "utf8"));
+  remember(indexCache, config.indexPath, { signature, index });
+  return index;
 }
 
 export function isVectorIndexCurrent(config) {
   const index = loadVectorIndex(config);
   if (!index?.knowledgeBaseHash) return false;
+  if (index.embeddingModel !== config.embeddingModel) return false;
   return index.knowledgeBaseHash === getKnowledgeBaseHash(config.knowledgeBaseDir);
 }
 
-export async function searchVectorIndex(config, question, limit = 5) {
+export async function searchVectorIndex(config, question, limit = 5, { signal } = {}) {
   const index = loadVectorIndex(config);
   if (!index || !index.chunks?.length || !isVectorIndexCurrent(config)) {
     return [];
@@ -202,7 +227,8 @@ export async function searchVectorIndex(config, question, limit = 5) {
   const questionEmbedding = await createEmbedding({
     apiKey: config.openaiApiKey,
     model: config.embeddingModel,
-    input: question
+    input: question,
+    signal
   });
 
   const minScore = Number.isFinite(config.minSimilarityScore)

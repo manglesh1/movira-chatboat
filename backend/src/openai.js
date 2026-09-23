@@ -1,24 +1,58 @@
-export async function createEmbedding({ apiKey, model, input }) {
-  const response = await fetch("https://api.openai.com/v1/embeddings", {
+function requestSignal(signal) {
+  const timeout = AbortSignal.timeout(20000);
+  return signal && typeof AbortSignal.any === "function" ? AbortSignal.any([signal, timeout]) : signal || timeout;
+}
+
+function safe(value) {
+  return typeof value === "string" && /^[a-zA-Z0-9_-]{1,120}$/.test(value) ? value : null;
+}
+
+async function providerRequest(url, options, signal, stage, validate) {
+  const combinedSignal = requestSignal(signal);
+  try {
+    const response = await fetch(url, { ...options, signal: combinedSignal });
+    let data;
+    try { data = await response.json(); }
+    catch (error) {
+      if (combinedSignal.aborted) throw error;
+      data = null;
+    }
+    if (!response.ok || !data || !validate(data)) {
+      // Never place upstream bodies, prompts, API keys or provider messages in errors.
+      const error = new Error("The AI provider request failed.");
+      const retry = response.headers.get("retry-after");
+      let retryAfterMs = retry ? Number(retry) * 1000 : 0;
+      if (retry && !Number.isFinite(retryAfterMs)) retryAfterMs = Date.parse(retry) - Date.now();
+      error.provider = { status: response.status, code: safe(data?.error?.code) || (response.ok || !data ? "malformed_response" : null),
+        type: safe(data?.error?.type), requestId: safe(response.headers.get("x-request-id")), stage,
+        retryAfterMs: Math.min(60000, Math.max(0, Number(retryAfterMs) || 0)) };
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    if (signal?.aborted || error.provider) throw error;
+    const failure = new Error("The AI provider request did not complete.");
+    failure.provider = { status: null, code: combinedSignal.aborted ? "provider_timeout" : "network_error", stage };
+    throw failure;
+  }
+}
+
+export async function createEmbedding({ apiKey, model, input, signal }) {
+  const data = await providerRequest("https://api.openai.com/v1/embeddings", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`
     },
     body: JSON.stringify({ model, input })
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(`Embedding request failed: ${response.status} ${message}`);
-  }
-
-  const data = await response.json();
+  }, signal, "embedding", (value) => Array.isArray(value.data?.[0]?.embedding)
+    && value.data[0].embedding.length > 0 && value.data[0].embedding.every(Number.isFinite));
   return data.data[0].embedding;
 }
 
-export async function createChatAnswer({ apiKey, model, messages }) {
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+export async function createChatAnswer({ apiKey, model, messages, signal }) {
+  const gpt5 = /^gpt-5(?:[.-]|$)/i.test(model || "");
+  const data = await providerRequest("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -26,16 +60,10 @@ export async function createChatAnswer({ apiKey, model, messages }) {
     },
     body: JSON.stringify({
       model,
-      temperature: 0.2,
+      ...(gpt5 ? { max_completion_tokens: 3000 } : { temperature: 0.2, max_tokens: 1600 }),
       messages
     })
-  });
-
-  if (!response.ok) {
-    const message = await response.text();
-    throw new Error(`Chat request failed: ${response.status} ${message}`);
-  }
-
-  const data = await response.json();
+  }, signal, "help_answer", (value) => typeof value.choices?.[0]?.message?.content === "string"
+    && Boolean(value.choices[0].message.content.trim()));
   return data.choices[0].message.content;
 }

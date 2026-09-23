@@ -18,9 +18,9 @@ Rules:
 - Do not give legal, HR, medical, or safety advice.
 - Use simple staff-facing language.
 - Avoid technical words unless the user specifically asks for technical detail.
-- When explaining a workflow, start with one short summary sentence.
-- Use numbered sections for the main stages.
-- Under each stage, use bullets with bold labels, like: **Open Activities:** Go to **Catalog > Activities**.
+- Answer the question directly in a friendly, concise first sentence. Do not repeat the question or add an unnecessary introduction.
+- For a how-to question, give the documented steps in order using a short numbered list. Add a brief note only when an important prerequisite or limitation matters.
+- For a simple factual question, use a short paragraph; do not force headings, numbered sections, or a long checklist.
 - Give exact navigation paths when they are present in the Movira information.
 - Write navigation paths in this format: **Catalog > Activities > Create Activity**.
 - If a path starts with "Administration > Catalog", remove "Administration >" and start from "Catalog".
@@ -52,7 +52,7 @@ function cleanStaffAnswer(answer) {
     .trim();
 }
 
-export async function answerQuestion(config, question) {
+export async function answerQuestion(config, question, { signal } = {}) {
   const readOnlyCheck = checkReadOnlyRequest(question);
   if (!readOnlyCheck.allowed) {
     return {
@@ -82,7 +82,8 @@ export async function answerQuestion(config, question) {
   const matches = await searchVectorIndex(
     config,
     question,
-    config.maxRetrievedChunks
+    config.maxRetrievedChunks,
+    { signal }
   );
 
   if (!matches.length) {
@@ -96,6 +97,7 @@ export async function answerQuestion(config, question) {
   const answer = await createChatAnswer({
     apiKey: config.openaiApiKey,
     model: config.chatModel,
+    signal,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       {
