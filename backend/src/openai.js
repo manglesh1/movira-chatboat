@@ -37,20 +37,26 @@ async function providerRequest(url, options, signal, stage, validate) {
   }
 }
 
-export async function createEmbedding({ apiKey, model, input, signal }) {
+export async function createEmbeddings({ apiKey, model, input, signal }) {
+  const inputs = Array.isArray(input) ? input : [input];
   const data = await providerRequest("https://api.openai.com/v1/embeddings", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`
     },
-    body: JSON.stringify({ model, input })
-  }, signal, "embedding", (value) => Array.isArray(value.data?.[0]?.embedding)
-    && value.data[0].embedding.length > 0 && value.data[0].embedding.every(Number.isFinite));
-  return data.data[0].embedding;
+    body: JSON.stringify({ model, input: inputs })
+  }, signal, "embedding", (value) => Array.isArray(value.data) && value.data.length === inputs.length
+    && value.data.every((item) => Array.isArray(item?.embedding) && item.embedding.length > 0
+      && item.embedding.every(Number.isFinite)));
+  return [...data.data].sort((a, b) => Number(a.index || 0) - Number(b.index || 0)).map((item) => item.embedding);
 }
 
-export async function createChatAnswer({ apiKey, model, messages, signal }) {
+export async function createEmbedding(options) {
+  return (await createEmbeddings(options))[0];
+}
+
+export async function createChatAnswer({ apiKey, model, messages, signal, maxCompletionTokens = 650 }) {
   const gpt5 = /^gpt-5(?:[.-]|$)/i.test(model || "");
   const data = await providerRequest("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -60,7 +66,7 @@ export async function createChatAnswer({ apiKey, model, messages, signal }) {
     },
     body: JSON.stringify({
       model,
-      ...(gpt5 ? { max_completion_tokens: 3000 } : { temperature: 0.2, max_tokens: 1600 }),
+      ...(gpt5 ? { max_completion_tokens: maxCompletionTokens } : { temperature: 0.2, max_tokens: maxCompletionTokens }),
       messages
     })
   }, signal, "help_answer", (value) => typeof value.choices?.[0]?.message?.content === "string"

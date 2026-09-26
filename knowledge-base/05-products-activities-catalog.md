@@ -20,6 +20,7 @@ The Catalog module defines what customers and staff can sell or book: activities
 | Create voucher pack | **Catalog > Voucher Packs > Create Voucher Pack** | Route `/voucher-packs/create`. |
 | Manage memberships | **Catalog > Memberships** | Route `/memberships`. |
 | Manage gift cards | **Catalog > Gift Cards** | Route `/gift-cards`. |
+| Create gift card | **Catalog > Gift Cards > Create Gift Card** | Gift cards are separate catalog products, not bookable activities. |
 | Manage inventory | **Catalog > Inventory** | Route `/inventory`. |
 | Create inventory item | **Catalog > Inventory > Create Inventory Item** | Route `/inventory/create`. |
 | Manage extras/add-ons | **Catalog > Extras** | Exact menu label not fully confirmed. |
@@ -85,6 +86,15 @@ Define tiers, durations, capacity resource usage, and price points.
 1. **Open Voucher Packs:** Go to **Catalog > Voucher Packs**.
 2. **Create Pack:** Define included entitlements such as jump passes or stock items.
 3. **Save:** Voucher-pack tickets/entitlements are minted after purchase/payment according to payment finalizers. Exact UI behavior not confirmed.
+
+### Workflow: Create A Gift Card
+1. **Open Gift Cards:** Go to **Catalog > Gift Cards** and select **Create Gift Card**.
+2. **Enter Gift Card Content:** Add the customer-facing name, customer price, face value, optional expiry, and description.
+3. **Configure Sales Settings:** Choose a fixed value or allow a custom amount with minimum and maximum limits. Add sale dates only when the gift card should be available for a limited period.
+4. **Configure Redemption And Visibility:** Choose whether customers can redeem it during online checkout. Use **Hide from sales channels** only when it should not be sold through booking, public checkout, or cashier sales.
+5. **Create Gift Card:** Review the settings and select **Create Gift Card**.
+
+Gift cards do not use activity schedules or capacity configuration. To create a timed or capacity-controlled product instead, use **Catalog > Activities > Create Activity**.
 
 ## Field Reference
 | Field | Required? | What It Means | Example | Notes |

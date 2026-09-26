@@ -1,11 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { createEmbedding } from "./openai.js";
+import { createEmbedding, createEmbeddings } from "./openai.js";
 
 const SUPPORTED_EXTENSIONS = new Set([".md", ".txt"]);
 const indexCache = new Map();
 const hashCache = new Map();
+const questionEmbeddingCache = new Map();
 
 function remember(cache, key, value) {
   if (cache.size >= 8 && !cache.has(key)) cache.delete(cache.keys().next().value);
@@ -162,12 +163,6 @@ export async function buildVectorIndex(config) {
     for (let index = 0; index < fileChunks.length; index += 1) {
       const fileChunk = fileChunks[index];
       const content = normalizeText(fileChunk.content);
-      const embedding = await createEmbedding({
-        apiKey: config.openaiApiKey,
-        model: config.embeddingModel,
-        input: content
-      });
-
       chunks.push({
         id: stableId(`${file.file}:${index}:${content}`),
         source: file.file,
@@ -176,10 +171,20 @@ export async function buildVectorIndex(config) {
         chunkIndex: index,
         sectionIndex: fileChunk.sectionIndex,
         chunkInSection: fileChunk.chunkInSection,
-        content,
-        embedding
+        content
       });
     }
+  }
+
+  const batchSize = config.indexEmbeddingBatchSize || 32;
+  for (let start = 0; start < chunks.length; start += batchSize) {
+    const batch = chunks.slice(start, start + batchSize);
+    const embeddings = await createEmbeddings({
+      apiKey: config.openaiApiKey,
+      model: config.embeddingModel,
+      input: batch.map((chunk) => chunk.content)
+    });
+    batch.forEach((chunk, index) => { chunk.embedding = embeddings[index]; });
   }
 
   fs.mkdirSync(path.dirname(config.indexPath), { recursive: true });
@@ -224,23 +229,46 @@ export async function searchVectorIndex(config, question, limit = 5, { signal } 
     return [];
   }
 
-  const questionEmbedding = await createEmbedding({
-    apiKey: config.openaiApiKey,
-    model: config.embeddingModel,
-    input: question,
-    signal
-  });
+  const normalizedQuestion = normalizeText(question).toLowerCase();
+  const embeddingKey = crypto.createHash("sha256")
+    .update(`${config.embeddingModel}\n${normalizedQuestion}`).digest("hex");
+  const cachedEmbedding = questionEmbeddingCache.get(embeddingKey);
+  let questionEmbedding;
+  if (cachedEmbedding?.expiresAt > Date.now()) {
+    questionEmbeddingCache.delete(embeddingKey);
+    questionEmbeddingCache.set(embeddingKey, cachedEmbedding);
+    questionEmbedding = cachedEmbedding.embedding;
+  } else {
+    if (cachedEmbedding) questionEmbeddingCache.delete(embeddingKey);
+    questionEmbedding = await createEmbedding({
+      apiKey: config.openaiApiKey,
+      model: config.embeddingModel,
+      input: question,
+      signal
+    });
+    while (questionEmbeddingCache.size >= (config.embeddingCacheMaxEntries || 1000)) {
+      questionEmbeddingCache.delete(questionEmbeddingCache.keys().next().value);
+    }
+    questionEmbeddingCache.set(embeddingKey, {
+      embedding: questionEmbedding,
+      expiresAt: Date.now() + (config.embeddingCacheTtlMs || 60 * 60 * 1000)
+    });
+  }
 
   const minScore = Number.isFinite(config.minSimilarityScore)
     ? config.minSimilarityScore
     : 0;
 
-  return index.chunks
+  const ranked = index.chunks
     .map((chunk) => ({
       ...chunk,
       score: cosineSimilarity(questionEmbedding, chunk.embedding)
     }))
     .filter((chunk) => chunk.score >= minScore)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score);
+  if (!ranked.length) return [];
+  // Drop weak tail matches relative to the best result. Fewer, stronger
+  // sections reduce tokens and reduce the chance of mixing workflows.
+  const relativeFloor = Math.max(minScore, ranked[0].score - 0.16);
+  return ranked.filter((chunk) => chunk.score >= relativeFloor).slice(0, limit);
 }

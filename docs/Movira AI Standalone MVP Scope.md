@@ -74,7 +74,7 @@ Example questions:
 - Which guide explains party setup?
 - What should I do if the knowledge base does not contain the answer?
 
-Every answer should include sources when it uses the knowledge base.
+Source matching remains internal. Staff answers must not expose guide filenames, paths, retrieval scores, or other source metadata.
 
 ## 5. What should it NOT do in V1?
 

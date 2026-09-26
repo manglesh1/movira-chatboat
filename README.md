@@ -63,7 +63,11 @@ Optional RAG tuning values:
 
 ```env
 RAG_MIN_SIMILARITY_SCORE=0.28
-RAG_MAX_RETRIEVED_CHUNKS=9
+RAG_MAX_RETRIEVED_CHUNKS=5
+STAFF_AI_HELP_MODEL=gpt-4.1-mini
+STAFF_AI_HELP_MAX_TOKENS=650
+STAFF_AI_HELP_CACHE_TTL_MS=3600000
+STAFF_AI_INDEX_BATCH_SIZE=32
 ```
 
 The real `.env` file is ignored by git. Only `.env.example` should be committed.
@@ -111,12 +115,12 @@ Starts the local chatbot at `http://localhost:8787`.
 1. Approved MovieRa documents live in `knowledge-base/`.
 2. `npm run index` reads each document.
 3. Markdown documents are split by headings, then into smaller overlapping chunks.
-4. Each chunk is embedded with the configured embedding model.
+4. Chunks are embedded in bounded batches with the configured embedding model.
 5. Chunks, headings, source files, and embeddings are saved to `backend/.cache/vector-index.json`.
 6. When a user asks a question, the backend embeds the question.
-7. The backend searches the local vector index and keeps only chunks above `RAG_MIN_SIMILARITY_SCORE`.
+7. The backend searches the local vector index, removes the weak relevance tail, and sends at most the configured number of chunks.
 8. The LLM receives only the matched MovieRa context and must answer from that context.
-9. The UI shows the answer and the source documents used.
+9. Exact normalized repeat questions reuse a knowledge-version-aware answer cache; internal source metadata is never shown to staff.
 
 Run retrieval checks after changing knowledge-base files or RAG settings:
 
@@ -126,20 +130,9 @@ npm run eval:rag
 
 ## Database Direction
 
-The local JSON vector index is fine for this local RAG phase.
+The versioned local JSON vector index is appropriate for the current 21-document Help corpus. Each API instance loads the same read-only deployment artifact, so retrieval does not add operational-database load. PostgreSQL stores only expiring Staff AI conversation/selection context in the main application.
 
-Before putting this inside the live MovieRa web app, move the vector index to:
-
-```text
-Postgres + pgvector
-```
-
-Why:
-
-- It can handle 20-30 simultaneous users comfortably for this RAG workload.
-- It keeps normal app data and vector search in one database.
-- It supports metadata filters later, such as role, venue, account, and document status.
-- It is easier to back up, monitor, and migrate than a local JSON file.
+Move document/chunk search to Postgres + pgvector only when documents must be edited and activated dynamically without rebuilding and deploying the index. Do not migrate solely to support more parks: Help documentation is global and park analytics uses the separate authorized reporting service.
 
 Future production tables:
 
@@ -150,7 +143,7 @@ rag_queries
 rag_feedback
 ```
 
-For the current phase, keep the local vector index until the RAG quality is good.
+For the current phase, keep the local vector index versioned with the deployed knowledge files.
 
 ## V1 Guardrails
 
@@ -170,7 +163,7 @@ The authenticated admin dashboard chat now uses this service for staff questions
 npm run dev
 ```
 
-The main API connects to `http://127.0.0.1:8787` by default. Set `STAFF_AI_URL` on the main API when the Staff AI service is hosted elsewhere. Staff answers remain read-only and include the matched guide sources; the separate customer assistant is unchanged.
+The main API connects to `http://127.0.0.1:8787` by default. Set `STAFF_AI_URL` on the main API when the Staff AI service is hosted elsewhere. Staff answers remain read-only. Retrieval metadata and guide filenames stay internal and are not returned to staff; the separate customer assistant is unchanged.
 
 ## Important Notes
 

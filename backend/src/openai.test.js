@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createEmbedding, createChatAnswer } from "./openai.js";
+import { createEmbedding, createEmbeddings, createChatAnswer } from "./openai.js";
 
 test("help provider errors retain only safe diagnostics, never upstream payloads", async (t) => {
   const original = globalThis.fetch;
@@ -39,6 +39,15 @@ test("help preserves success and client aborts; network failures have safe metad
   await assert.rejects(createEmbedding({}), (error) => error.provider.code === "network_error" && !error.message.includes("sensitive"));
 });
 
+test("embedding batches preserve provider index order", async (t) => {
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  globalThis.fetch = async () => new Response(JSON.stringify({ data: [
+    { index: 1, embedding: [0, 1] }, { index: 0, embedding: [1, 0] },
+  ] }));
+  assert.deepEqual(await createEmbeddings({ input: ["first", "second"] }), [[1, 0], [0, 1]]);
+});
+
 test("malformed success responses are tagged as provider failures", async (t) => {
   const original = globalThis.fetch;
   t.after(() => { globalThis.fetch = original; });
@@ -57,9 +66,9 @@ test("GPT-5 Help request omits temperature and uses completion tokens", async (t
   };
   await createChatAnswer({ model: "gpt-5-mini", messages: [] });
   await createChatAnswer({ model: "gpt-4.1-mini", messages: [] });
-  assert.equal(bodies[0].max_completion_tokens, 3000);
+  assert.equal(bodies[0].max_completion_tokens, 650);
   assert.ok(!("temperature" in bodies[0]));
   assert.ok(!("max_tokens" in bodies[0]));
   assert.equal(bodies[1].temperature, 0.2);
-  assert.equal(bodies[1].max_tokens, 1600);
+  assert.equal(bodies[1].max_tokens, 650);
 });
